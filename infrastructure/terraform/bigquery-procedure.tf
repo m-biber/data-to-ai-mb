@@ -53,6 +53,7 @@ resource "google_bigquery_routine" "process_images_procedure" {
     images_table                      = "${local.fq_dataset_id}.${google_bigquery_table.images.table_id}"
     reports_table                     = "${local.fq_dataset_id}.${google_bigquery_table.image_reports.table_id}"
     multimodal_model                  = "${local.fq_dataset_id}.${local.default_model_name}"
+    multimodal_model_endpoint         = var.default_multimodal_vertex_ai_model
     text_embeddings_table             = "${local.fq_dataset_id}.${google_bigquery_table.text_embeddings.table_id}"
     text_embeddings_model             = "${local.fq_dataset_id}.${local.text_embedding_model_name}"
     multimodal_embeddings_table       = "${local.fq_dataset_id}.${google_bigquery_table.multimodal_embeddings.table_id}"
@@ -64,6 +65,7 @@ resource "google_bigquery_routine" "process_images_procedure" {
     temperature                       = local.prompt_config.temperature
     max_output_tokens                 = local.prompt_config.max_output_tokens
     clean_generate_text_json_function = "${local.fq_dataset_id}.${google_bigquery_routine.clean_generate_text_json_response_function.routine_id}"
+    vertex_ai_connection_id           = "${var.project_id}.${var.bigquery_dataset_location}.${google_bigquery_connection.vertex_ai_connection.connection_id}"
   })
 }
 

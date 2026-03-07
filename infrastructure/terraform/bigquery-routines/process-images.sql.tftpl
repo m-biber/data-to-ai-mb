@@ -12,39 +12,41 @@ SET now = CURRENT_TIMESTAMP();
 CREATE TEMP TABLE new_reports AS
 WITH llm_response AS (
 SELECT uri,
+       STRING(OBJ.GET_ACCESS_URL(ref,'r').access_urls.read_url) AS signed_url,
        content_type,
        updated,
-       ml_generate_text_llm_result AS raw_response,
-       `${clean_generate_text_json_function}`(ml_generate_text_llm_result) as cleaned_response,
        (SELECT value FROM UNNEST(metadata) WHERE name = 'stop_id') AS bus_stop_id,
-       ml_generate_text_status AS model_response_status
-FROM
-    ML.GENERATE_TEXT(
-        MODEL `${multimodal_model}`,
-        TABLE `${images_table}`,
-        STRUCT (
-           """${prompt}""" AS prompt,
-           ${temperature} AS temperature,
-           ${max_output_tokens} AS max_output_tokens,
-           TRUE AS flatten_json_output)
-        )
-    WHERE content_type = "image/jpeg" AND updated > last_process_time AND updated < now
+       AI.GENERATE(
+        (
+          """${prompt}""",
+          OBJ.GET_ACCESS_URL(ref, 'r')
+        ),
+        connection_id => '${vertex_ai_connection_id}',
+        endpoint => '${multimodal_model_endpoint}',
+        output_schema => '''description STRING,
+                          cleanliness_level INT64,
+                          safety_level INT64,
+                          number_of_people INT64,
+                          is_bus_stop BOOL'''
+                          ) AS ai_response, #TODO: move to schema
+FROM `${images_table}`
+WHERE content_type = "image/jpeg" AND updated > last_process_time AND updated < now
 )
 SELECT
     GENERATE_UUID() as report_id,
     uri,
+    signed_url,
     content_type,
     updated,
     '${multimodal_model_id}' AS model_used,
-    model_response_status,
-    raw_response,
-    cleaned_response,
     bus_stop_id,
-    CAST (JSON_EXTRACT(cleaned_response, '$.cleanliness_level') AS INT64) AS cleanliness_level,
-    CAST (JSON_EXTRACT(cleaned_response, '$.safety_level') AS INT64) AS safety_level,
-    JSON_EXTRACT(cleaned_response, '$.description') AS description,
-    CAST (JSON_EXTRACT(cleaned_response, '$.is_bus_stop') AS BOOL) AS is_bus_stop,
-    CAST (JSON_EXTRACT(cleaned_response, '$.number_of_people') AS INT64) AS number_of_people
+    ai_response.status AS model_response_status,
+    ai_response.full_response AS raw_response,
+    ai_response.description,
+    ai_response.cleanliness_level,
+    ai_response.safety_level,
+    ai_response.number_of_people,
+    ai_response.is_bus_stop
 FROM llm_response;
 
 -- For production implementation a loop of re-processing failed predictions would be necessary.
@@ -60,12 +62,12 @@ END;
 
 BEGIN
   DECLARE first_failure_to_extract_attributes DEFAULT
-    (SELECT CONCAT("Failed to produce requested JSON for at least one file: ", "URI: ", uri,
-    ", response:", raw_response,
-    ", cleaned response: ", COALESCE(cleaned_response, "FAILED TO CLEAN RESPONSE"))
+    (SELECT CONCAT("Failed to produce requested schema for at least one file: ", "URI: ", uri,
+    ", response:", COALESCE(TO_JSON_STRING(raw_response), "NULL"))
         FROM new_reports WHERE
-          cleanliness_level IS NULL OR
           description IS NULL OR
+          cleanliness_level IS NULL OR
+          safety_level IS NULL OR
           is_bus_stop IS NULL OR
           number_of_people IS NULL
         LIMIT 1);
@@ -75,8 +77,8 @@ BEGIN
 END;
 
 -- Insert new reports
-INSERT INTO `${reports_table}` (report_id, uri, content_type, image_created, model_used, bus_stop_id, cleanliness_level, safety_level, description, number_of_people, is_bus_stop)
-SELECT report_id, uri, content_type, updated, model_used, bus_stop_id, cleanliness_level, safety_level, description, number_of_people, is_bus_stop
+INSERT INTO `${reports_table}` (report_id, uri, content_type, image_created, model_used, bus_stop_id, signed_url, description, cleanliness_level, safety_level, number_of_people, is_bus_stop)
+SELECT report_id, uri, content_type, updated, model_used, bus_stop_id, signed_url, description, cleanliness_level, safety_level, number_of_people, is_bus_stop
   FROM new_reports;
 
 -- Generate multimodal embeddings

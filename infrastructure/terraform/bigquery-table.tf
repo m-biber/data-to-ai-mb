@@ -76,7 +76,7 @@ resource "google_bigquery_table" "image_reports" {
   deletion_protection = false
   dataset_id          = local.dataset_id
   table_id            = "image_reports"
-  description         = "Results of attribute extraction for an individual image"
+  description         = "Results of attribute extraction for an individual image."
   clustering          = ["bus_stop_id"]
   schema              = file("${path.module}/bigquery-schema/reports.json")
 
