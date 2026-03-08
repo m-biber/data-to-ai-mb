@@ -68,13 +68,9 @@ class Config(BaseSettings):
     show_thoughts: bool = Field(
         default=True,
         description="Show model's thoughts")
-    use_mcp_toolbox: bool = Field(
-        default=False,
-        description="Indicates if the MCP server should be used instead of the local tools"
-    )
-    mcp_toolbox_uri: str | None = Field(default="",
-                                        description="URI of the MCP server"
-                                        )
+    mcp_toolbox_uri: str = Field(default="http://127.0.0.1:5000",
+                                 description="URI of the MCP server"
+                                 )
     def get_bigquery_data_project(self) -> str:
         return self.CLOUD_BIGQUERY_DATA_PROJECT or self.CLOUD_PROJECT
 

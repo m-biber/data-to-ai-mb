@@ -71,19 +71,18 @@ This is the starting point for the agent to start scheduling maintenance.
    For the rest of this tutorial **ensure you remain in the `agents/maintenance-scheduler` directory
    **.
 
-2. Install dependencies using Poetry:
+2. Install dependencies using uv:
 
-- if you have not installed poetry before then run `pip3 install poetry` first. Then you can create
-  your virtual environment and install all dependencies using:
+- Create your virtual environment and install all dependencies using:
 
   ```bash
-  poetry install
+  uv sync
   ```
 
   To activate the virtual environment run:
 
   ```bash
-  poetry env activate
+  source .venv/bin/activate
   ```
 
 3. Set up environment variables that will be used by the local version of ADK
